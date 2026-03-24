@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { WatchlistItem, Task } from '../types';
+import { WatchlistItem, Task, UserProfile } from '../types';
 import { storageService } from '../services/storageService';
 import { mentorService, extractTasksFromText } from '../services/minimaxService';
 import { 
@@ -26,6 +26,7 @@ import ReactMarkdown from 'react-markdown';
 
 const Watchlist: React.FC = () => {
   const [items, setItems] = useState<WatchlistItem[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -61,6 +62,13 @@ const Watchlist: React.FC = () => {
     loadWatchlist();
     // Initialize with current local time
     setAddForm(prev => ({ ...prev, observationTime: getLocalISOString() }));
+    // Load user profile
+    const savedProfile = localStorage.getItem('titan_user_profile');
+    if (savedProfile && savedProfile !== 'null' && savedProfile !== 'undefined') {
+      try {
+        setUserProfile(JSON.parse(savedProfile));
+      } catch (e) {}
+    }
   }, []);
 
   const loadWatchlist = async () => {
@@ -142,11 +150,11 @@ const Watchlist: React.FC = () => {
   };
 
   const handleAnalyze = async () => {
-    if (items.length === 0 || isAnalyzing) return;
+    if (items.length === 0 || isAnalyzing || !userProfile) return;
     setIsAnalyzing(true);
     setAnalysisResult('');
     try {
-      const result = await mentorService.generateWatchlistAnalysis(items);
+      const result = await mentorService.generateWatchlistAnalysis(items, userProfile);
       setAnalysisResult(result);
       
       // Auto-extract tasks

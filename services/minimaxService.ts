@@ -10,6 +10,16 @@ interface MiniMaxMessage {
   content: string | { type: 'text' } | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
 }
 
+interface MiniMaxHistoryItem {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp?: number;
+  mentorId?: MentorId;
+  isThinking?: boolean;
+  attachments?: Attachment[];
+}
+
 const withRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> => {
   try {
     return await fn();
@@ -133,7 +143,7 @@ async function callMiniMax(messages: MiniMaxMessage[], systemInstruction?: strin
 export class MentorService {
   private currentMentorId: MentorId = MentorId.BOARD;
   private currentModelId: string | null = null;
-  private messageHistory: Message[] = [];
+  private messageHistory: MiniMaxHistoryItem[] = [];
 
   async fetchRealtimePrices(assets: { symbol: string, type: 'crypto' | 'stock' }[]): Promise<Record<string, { price: number, change: number }>> {
     if (assets.length === 0) return {};
@@ -226,7 +236,7 @@ ${portfolioText}`;
     }
   }
 
-  async generateWatchlistAnalysis(items: WatchlistItem[]): Promise<string> {
+  async generateWatchlistAnalysis(items: WatchlistItem[], profile: UserProfile): Promise<string> {
     const watchlistText = items.map(i => `- ${i.symbol}: 现价 $${i.currentPrice || 'N/A'}, 目标买入 $${i.targetBuyPrice || 'N/A'}`).join('\n');
     const prompt = `请调用你的专属投资逻辑框架（Skill），作为顶级交易员，扫描以下美股/加密货币"猎杀清单"。
 
@@ -320,7 +330,7 @@ ${historyText.substring(0, 30000)}`;
     }
   }
 
-  async sendMessageStream(message: string, profile: UserProfile, mentorId: MentorId, attachments: Attachment[] = [], modelId: string, liveContext?: string) {
+  async sendMessageStream(message: string, profile: UserProfile, mentorId: MentorId, attachments: Attachment[] = [], modelId: string, liveContext?: string): Promise<AsyncGenerator<{ text: string; groundingMetadata: any }, void, unknown>> {
     try {
       if (!this.messageHistory.length || this.currentModelId !== modelId) {
         await this.startChat(profile, mentorId, modelId, [], liveContext);
@@ -329,7 +339,6 @@ ${historyText.substring(0, 30000)}`;
       let textToSend = message;
       if (liveContext) textToSend = `[Context Update: 持仓与自选]\n${liveContext}\n\n[User]\n${message}`;
 
-      const userMessage: MiniMaxMessage = { role: 'user', content: textToSend };
       this.messageHistory.push({ id: Date.now().toString(), role: 'user', content: textToSend, timestamp: Date.now() });
 
       const systemInstruction = getSystemInstruction(profile, mentorId, liveContext);
@@ -346,41 +355,37 @@ ${historyText.substring(0, 30000)}`;
       const decoder = new TextDecoder();
       let fullText = '';
 
-      const stream = new ReadableStream({
-        async start(controller) {
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split('\n');
-              
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const data = line.slice(6);
-                  if (data === '[DONE]') {
-                    controller.close();
-                    return;
-                  }
-                  try {
-                    const parsed = JSON.parse(data);
-                    if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                      fullText += parsed.delta.text;
-                      controller.enqueue({ text: fullText, groundingMetadata: null });
-                    }
-                  } catch (e) {}
+      async function* streamGenerator() {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') {
+                  return;
                 }
+                try {
+                  const parsed = JSON.parse(data);
+                  if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                    fullText += parsed.delta.text;
+                    yield { text: fullText, groundingMetadata: null };
+                  }
+                } catch (e) {}
               }
             }
-            controller.close();
-          } catch (e) {
-            controller.error(e);
           }
+        } catch (e) {
+          throw e;
         }
-      });
+      }
 
-      return stream;
+      return streamGenerator();
     } catch (error: any) {
       console.error("MiniMax sendMessageStream failed:", error);
       throw error;
