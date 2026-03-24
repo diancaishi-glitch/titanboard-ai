@@ -1,0 +1,7 @@
+{
+  "name": "TitanBoard: AI 投资导师",
+  "description": "一个由查理·芒格、彼得·蒂尔、索罗斯、赵长鹏等传奇投资者组成的AI模拟董事会，指导你在加密货币和纳斯达克市场中进行投资。",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
