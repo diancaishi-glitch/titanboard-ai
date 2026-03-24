@@ -12,19 +12,19 @@ import {
 
 export const AI_MODELS: AIModelConfig[] = [
   {
-    id: 'MiniMax-M2.7',
-    name: 'MiniMax M2.7',
-    description: '最新一代推理模型，具备超长上下文和深度思考能力，适合复杂投资分析。'
+    id: 'gpt-4o',
+    name: 'GPT-4o',
+    description: '最新一代 GPT-4 模型，具备最强推理能力，适合复杂投资分析。'
   },
   {
-    id: 'MiniMax-M2.5',
-    name: 'MiniMax M2.5',
-    description: '稳定版模型，适合日常投资分析和聊天。'
+    id: 'gpt-4o-mini',
+    name: 'GPT-4o Mini',
+    description: '轻量版 GPT-4o，适合快速问答和日常交流。'
   },
   {
-    id: 'MiniMax-M2.5-highspeed',
-    name: 'MiniMax M2.5 Highspeed',
-    description: '极速响应版本，适合快速问答。'
+    id: 'gpt-4-turbo',
+    name: 'GPT-4 Turbo',
+    description: '快速版 GPT-4，适合高频率调用。'
   }
 ];
 

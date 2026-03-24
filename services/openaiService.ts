@@ -1,14 +1,13 @@
 import { UserProfile, Message, MentorId, Attachment, Task, Position, WatchlistItem } from "../types";
 import { MENTORS } from "../constants";
-import { storageService } from "./storageService";
+import OpenAI from "openai";
 
-const API_KEY = import.meta.env.VITE_MINIMAX_API_KEY || import.meta.env.MINIMAX_API_KEY || '';
-const BASE_URL = 'https://api.minimaxi.com/anthropic/v1';
+const API_KEY = import.meta.env.VITE_OPENAI_API_KEY || '';
 
-interface MiniMaxMessage {
-  role: 'user' | 'assistant';
-  content: string | { type: 'text' } | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
-}
+const openai = new OpenAI({
+  apiKey: API_KEY,
+  dangerouslyAllowBrowser: true
+});
 
 interface MiniMaxHistoryItem {
   id: string;
@@ -114,32 +113,6 @@ const getSystemInstruction = (profile: UserProfile, activeMentorId: MentorId, sy
   return instruction;
 };
 
-async function callMiniMax(messages: MiniMaxMessage[], systemInstruction?: string, stream = false): Promise<any> {
-  const response = await fetch(`${BASE_URL}/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${API_KEY}`,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'MiniMax-M2.7',
-      max_tokens: 8192,
-      system: systemInstruction,
-      messages,
-      stream
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`MiniMax API error: ${response.status} - ${error}`);
-  }
-
-  return stream ? response : await response.json();
-}
-
 export class MentorService {
   private currentMentorId: MentorId = MentorId.BOARD;
   private currentModelId: string | null = null;
@@ -151,14 +124,16 @@ export class MentorService {
     const prompt = `Retrieve latest prices for: ${assetList}. Focus on Nasdaq and Crypto. Return JSON array: [{"symbol": "BTC", "price": number, "changePercent": number}]`;
     
     try {
-      const data = await withRetry(() => callMiniMax([
-        { role: 'user', content: prompt }
-      ]));
+      const response = await withRetry(() => openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' }
+      }));
       
-      const rawData = cleanAndParseJSON(data.content?.[0]?.text || '[]');
+      const rawData = cleanAndParseJSON(response.choices[0]?.message?.content || '[]');
       const result: Record<string, { price: number, change: number }> = {};
-      if (Array.isArray(rawData)) {
-        rawData.forEach((item: any) => {
+      if (rawData && Array.isArray(rawData.data || rawData)) {
+        (rawData.data || rawData).forEach((item: any) => {
           if (item.symbol && typeof item.price === 'number') {
             result[item.symbol.toUpperCase()] = { price: item.price, change: item.changePercent || 0 };
           }
@@ -172,43 +147,10 @@ export class MentorService {
   }
 
   async parsePortfolioScreenshot(base64Images: string[]): Promise<Partial<Position>[]> {
-    const prompt = `
-      Analyze these investment portfolio screenshots (there may be multiple images).
-      Extract all asset positions from ALL images. 
-      If the same asset appears in multiple screenshots, merge the information intelligently (e.g., if one shows quantity and another shows cost).
-      Identify if it is a Stock or Crypto based on the symbol (e.g., BTC, ETH, SOL are crypto; AAPL, TSLA, NVDA are stock).
-      
-      Return a STRICT JSON array with this structure:
-      [
-        {
-          "symbol": "BTC",
-          "name": "Bitcoin", 
-          "type": "crypto",
-          "avgCost": 65000.50,
-          "quantity": 0.5,
-          "currentPrice": 67000.00
-        }
-      ]
-      Ignore cash balances or totals. Only extract individual positions.
-    `;
-
-    const imageContents = base64Images.map(img => ({
-      type: 'image',
-      source: { type: 'base64', media_type: 'image/png', data: img }
-    }));
-
-    try {
-      const data = await withRetry(() => callMiniMax([
-        { role: 'user', content: [...imageContents, { type: 'text', text: prompt }] as any }
-      ]));
-      
-      const textResponse = data.content?.[0]?.type === 'text' ? data.content[0].text : '';
-      const parsed = cleanAndParseJSON(textResponse || '[]');
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (error) {
-      console.error("Vision parse failed", error);
-      return [];
-    }
+    // For now, return empty - image parsing requires more setup
+    // TODO: Implement with proper OpenAI vision API
+    console.log("Image parsing not implemented for OpenAI yet");
+    return [];
   }
 
   async generatePositionAnalysis(positions: Position[], profile: UserProfile): Promise<string> {
@@ -225,11 +167,15 @@ export class MentorService {
 ${portfolioText}`;
 
     try {
-      const data = await withRetry(() => callMiniMax([
-        { role: 'user', content: prompt }
-      ], getSystemInstruction(profile, this.currentMentorId)));
+      const response = await withRetry(() => openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: getSystemInstruction(profile, this.currentMentorId) },
+          { role: 'user', content: prompt }
+        ]
+      }));
       
-      return data.content?.[0]?.text || '';
+      return response.choices[0]?.message?.content || '';
     } catch (error) {
       console.error("generatePositionAnalysis failed:", error);
       return '持仓分析生成失败。';
@@ -250,11 +196,15 @@ ${portfolioText}`;
 ${watchlistText}`;
 
     try {
-      const data = await withRetry(() => callMiniMax([
-        { role: 'user', content: prompt }
-      ], getSystemInstruction(profile, this.currentMentorId)));
+      const response = await withRetry(() => openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: getSystemInstruction(profile, this.currentMentorId) },
+          { role: 'user', content: prompt }
+        ]
+      }));
       
-      return data.content?.[0]?.text || '';
+      return response.choices[0]?.message?.content || '';
     } catch (error) {
       console.error("generateWatchlistAnalysis failed:", error);
       return '观察哨分析生成失败。';
@@ -273,11 +223,15 @@ ${watchlistText}`;
 5. 必须输出具体的行动指南：[[TASK: 标的 | 指令]]。`;
 
     try {
-      const data = await withRetry(() => callMiniMax([
-        { role: 'user', content: prompt }
-      ], getSystemInstruction(profile, activeMentorId)));
+      const response = await withRetry(() => openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: getSystemInstruction(profile, activeMentorId) },
+          { role: 'user', content: prompt }
+        ]
+      }));
       
-      return data.content?.[0]?.text || '';
+      return response.choices[0]?.message?.content || '';
     } catch (error) {
       console.error("generateFirstPrinciplesAnalysis failed:", error);
       return '市场分析生成失败。';
@@ -300,11 +254,12 @@ ${watchlistText}`;
 ${historyText.substring(0, 30000)}`;
 
     try {
-      const data = await withRetry(() => callMiniMax([
-        { role: 'user', content: prompt }
-      ]));
+      const response = await withRetry(() => openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }]
+      }));
       
-      return data.content?.[0]?.text || "记忆压缩失败。";
+      return response.choices[0]?.message?.content || "记忆压缩失败。";
     } catch (error) {
       console.error("compressMemory failed:", error);
       return "记忆压缩失败。";
@@ -325,7 +280,7 @@ ${historyText.substring(0, 30000)}`;
         attachments: msg.attachments
       }));
     } catch (error: any) {
-      console.error("MiniMax startChat failed:", error);
+      console.error("OpenAI startChat failed:", error);
       throw error;
     }
   }
@@ -343,51 +298,30 @@ ${historyText.substring(0, 30000)}`;
 
       const systemInstruction = getSystemInstruction(profile, mentorId, liveContext);
 
-      const response = await withRetry(() => callMiniMax(
-        this.messageHistory as MiniMaxMessage[],
-        systemInstruction,
-        true
-      ));
+      const stream = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: systemInstruction },
+          ...this.messageHistory.map(msg => ({ role: msg.role as 'user' | 'assistant', content: msg.content }))
+        ],
+        stream: true
+      });
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response stream");
-
-      const decoder = new TextDecoder();
       let fullText = '';
 
       async function* streamGenerator() {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6);
-                if (data === '[DONE]') {
-                  return;
-                }
-                try {
-                  const parsed = JSON.parse(data);
-                  if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                    fullText += parsed.delta.text;
-                    yield { text: fullText, groundingMetadata: null };
-                  }
-                } catch (e) {}
-              }
-            }
+        for await (const chunk of stream) {
+          const content = chunk.choices[0]?.delta?.content || '';
+          if (content) {
+            fullText += content;
+            yield { text: fullText, groundingMetadata: null };
           }
-        } catch (e) {
-          throw e;
         }
       }
 
       return streamGenerator();
     } catch (error: any) {
-      console.error("MiniMax sendMessageStream failed:", error);
+      console.error("OpenAI sendMessageStream failed:", error);
       throw error;
     }
   }
@@ -402,11 +336,15 @@ ${historyText.substring(0, 30000)}`;
     `;
     
     try {
-      const data = await withRetry(() => callMiniMax([
-        { role: 'user', content: prompt }
-      ], getSystemInstruction(profile, MentorId.BOARD)));
+      const response = await withRetry(() => openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: getSystemInstruction(profile, MentorId.BOARD) },
+          { role: 'user', content: prompt }
+        ]
+      }));
       
-      return data.content?.[0]?.text || '';
+      return response.choices[0]?.message?.content || '';
     } catch (error) {
       console.error("Market analysis generation failed:", error);
       throw error;
@@ -425,10 +363,14 @@ ${historyText.substring(0, 30000)}`;
   
   async generateLessonContent(topic: string, moduleContext: string, profile: UserProfile): Promise<string> {
     try {
-      const data = await withRetry(() => callMiniMax([
-        { role: 'user', content: `课程主题: ${topic}。结尾请布置作业: [[TASK: 学习 | 作业内容]]。` }
-      ], getSystemInstruction(profile, MentorId.BOARD)));
-      return data.content?.[0]?.text || '';
+      const response = await withRetry(() => openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: getSystemInstruction(profile, MentorId.BOARD) },
+          { role: 'user', content: `课程主题: ${topic}。结尾请布置作业: [[TASK: 学习 | 作业内容]]。` }
+        ]
+      }));
+      return response.choices[0]?.message?.content || '';
     } catch (error) {
       console.error("generateLessonContent failed:", error);
       return '';

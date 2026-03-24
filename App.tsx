@@ -9,7 +9,7 @@ import Homework from './components/Homework';
 import Positions from './components/Positions';
 import Watchlist from './components/Watchlist';
 import { UserProfile, MentorId, LearningModule, Message } from './types';
-import { mentorService } from './services/minimaxService';
+import { mentorService } from './services/openaiService';
 import { storageService } from './services/storageService';
 import { AI_MODELS, SUGGESTED_METRICS } from './constants';
 import { 

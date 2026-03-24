@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { WatchlistItem, Task, UserProfile } from '../types';
 import { storageService } from '../services/storageService';
-import { mentorService, extractTasksFromText } from '../services/minimaxService';
+import { mentorService, extractTasksFromText } from '../services/openaiService';
 import { 
   Eye, 
   Plus, 

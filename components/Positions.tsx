@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Position, UserProfile, Task } from '../types';
 import { storageService } from '../services/storageService';
-import { mentorService, extractTasksFromText } from '../services/minimaxService';
+import { mentorService, extractTasksFromText } from '../services/openaiService';
 import { 
   Briefcase, Plus, Trash2, Loader2, X, Bitcoin, Globe, RefreshCw, CheckCircle,
   TrendingUp, TrendingDown, Scale, PieChart, Activity, Search, Target, AlertTriangle,

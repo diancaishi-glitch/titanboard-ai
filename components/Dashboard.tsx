@@ -34,7 +34,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { INITIAL_MODULES, MENTORS } from '../constants';
 import { UserProfile, LearningModule, MentorId, Message, Task } from '../types';
-import { mentorService, extractTasksFromText } from '../services/minimaxService';
+import { mentorService, extractTasksFromText } from '../services/openaiService';
 import { storageService } from '../services/storageService';
 
 import { 
