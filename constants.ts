@@ -12,29 +12,19 @@ import {
 
 export const AI_MODELS: AIModelConfig[] = [
   {
-    id: 'gemini-3.1-pro-preview',
-    name: 'Gemini 3.1 Pro Preview',
-    description: '最新一代 Pro 模型，具备更强的推理、代码和多模态能力。'
+    id: 'MiniMax-M2.7',
+    name: 'MiniMax M2.7',
+    description: '最新一代推理模型，具备超长上下文和深度思考能力，适合复杂投资分析。'
   },
   {
-    id: 'gemini-3-pro-preview',
-    name: 'Gemini 3.0 Pro (Thinking)',
-    description: '当前最强。具备顶级推理能力、长文本理解和深度思考能力，适合复杂投资分析。'
+    id: 'MiniMax-M2.5',
+    name: 'MiniMax M2.5',
+    description: '稳定版模型，适合日常投资分析和聊天。'
   },
   {
-    id: 'gemini-3-flash-preview',
-    name: 'Gemini 3.0 Flash',
-    description: '速度极快，延迟低。适合快速问答和日常交流，但深度推理稍弱。'
-  },
-  {
-    id: 'gemini-3.1-flash-lite-preview',
-    name: 'Gemini 3.1 Flash Lite',
-    description: '轻量级 Flash 模型，极速响应，适合简单任务。'
-  },
-  {
-    id: 'gemini-flash-latest',
-    name: 'Gemini Flash Latest',
-    description: '最新稳定版 Flash 模型，提供快速且高效的响应。'
+    id: 'MiniMax-M2.5-highspeed',
+    name: 'MiniMax M2.5 Highspeed',
+    description: '极速响应版本，适合快速问答。'
   }
 ];
 

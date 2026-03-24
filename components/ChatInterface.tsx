@@ -20,7 +20,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { MENTORS } from '../constants';
 import { Message, MentorId, UserProfile, Attachment, Task } from '../types';
-import { mentorService, extractTasksFromText } from '../services/geminiService';
+import { mentorService, extractTasksFromText } from '../services/minimaxService';
 import { storageService } from '../services/storageService';
 
 interface ChatInterfaceProps {

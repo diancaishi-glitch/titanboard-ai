@@ -27,7 +27,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import { LearningModule, UserProfile, MentorId, Task } from '../types';
 import { INITIAL_MODULES, MENTORS } from '../constants';
-import { mentorService, extractTasksFromText } from '../services/geminiService';
+import { mentorService, extractTasksFromText } from '../services/minimaxService';
 import { storageService } from '../services/storageService';
 
 interface CurriculumProps {
